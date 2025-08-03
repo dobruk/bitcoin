@@ -4,23 +4,21 @@ create_privatekey_from_prefixes.py
 
 Autor:      Marcin Dobruk <marcin@dobruk.pl>
 Utworzono:  2025-08-03
-Wersja:     0.1.0
+Wersja:     0.1.5
 Licencja:   MIT
 Opis:
     Generuje pary klucz-adres (WIF + adres BitcoinSV) dla listy prefiksów vanity.
     Prefiksy podaje się jako pojedynczy argument w formacie:
-      P1,P2,P3 (bez nawiasów) 
+      P1,P2,P3 (bez nawiasów)
       lub
       "P1; P2; P3" (z dowolnymi separatorami).
     Wyświetla status co zadany odstęp prób (domyślnie co 100k) w formacie:
       [STATUS] 300000 prób | 12.5s | ~24000 addr/s
-    Po znalezieniu każdego adresu wypisuje wynik w formacie JSON:
-      {
-        "key_wif": "...",
-        "new_address": "1ZUKU...",
-        "name": ""
-      }
-    oraz zapisuje dane do pliku `walletbsv-[address].json`.
+    Po znalezieniu każdego adresu wypisuje wyróżniony wynik (czarne litery na białym tle):
+      ✔️ Prefiks P → adres 1XYZ… po N prób (tCzas)
+    oraz zapisuje dane do katalogu nadrzędnego `walletsbsv/vanity_wallets`.
+    Czyści ekran konsoli na początku, wyświetla wyróżniony nagłówek
+    i dodaje pustą linię przed uruchomieniem głównej akcji.
 Zależności:
     • Python ≥3.7
     • biblioteka bitsv (pip install bitsv)
@@ -28,12 +26,22 @@ Przykład:
     python create_privatekey_from_prefixes.py ZUKU,BSV,GKS
     python create_privatekey_from_prefixes.py "ZUKU; BSV; GKS" 50000
 """
+import os
 import sys
 import json
 import secrets
 import bitsv
 import time
 import re
+from pathlib import Path
+
+# Funkcja czyszcząca ekran terminala
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+# Katalog, w którym zostaną zapisane pliki JSON z kluczami
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'walletsbsv' / 'vanity_wallets'
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def format_duration(seconds: float) -> str:
@@ -57,8 +65,8 @@ def format_duration(seconds: float) -> str:
 
 
 def save_to_file(address: str, key_wif: str, name: str = ""):
-    """Zapisuje dane do pliku walletbsv-[address].json."""
-    filename = f"walletbsv-{address}.json"
+    """Zapisuje dane do pliku walletbsv-[address].json w katalogu VANITY_WALLETS."""
+    filename = OUTPUT_DIR / f"walletbsv-{address}.json"
     data = {
         "key_wif": key_wif,
         "new_address": address,
@@ -87,8 +95,8 @@ def generate_vanity_list(prefixes, status_interval=100_000):
             if prefix not in found and addr.startswith(target):
                 elapsed = time.perf_counter() - start
                 found[prefix] = True
-                print(f"\n✔️ Prefiks {prefix} → adres {addr} po {tries:,} próbach ({format_duration(elapsed)})")
-                # Zapis do pliku
+                # Wyróżniony wynik czarne litery na białym tle
+                print(f"\n\033[47m\033[30m✔️ Prefiks {prefix} → adres {addr} po {tries:,} próbach ({format_duration(elapsed)})\033[0m")
                 save_to_file(addr, key.to_wif())
 
         if tries % status_interval == 0:
@@ -102,6 +110,14 @@ def generate_vanity_list(prefixes, status_interval=100_000):
 
 
 if __name__ == '__main__':
+    # Czyścimy ekran konsoli
+    clear_screen()
+    # Wyróżniony nagłówek: czarne litery na białym tle
+    header = "create_privatekey_from_prefixes.py v0.1.5 — BSV Vanity Generator: generuje pary klucz-adres dla podanych prefiksów vanity"
+    print(f"\033[47m\033[30m{header}\033[0m")
+    # Pusta linia przed główną logiką
+    print()
+
     if len(sys.argv) < 2 or len(sys.argv) > 3:
         print("Użycie: python create_privatekey_from_prefixes.py <PREFIX_LIST> [status_interval]")
         sys.exit(1)
